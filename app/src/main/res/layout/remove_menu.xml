@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageButton
+        android:id="@+id/showCheckboxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="visible"
+        android:src="@mipmap/sbalogo_foreground"
+        android:layout_margin="6dp"
+        android:layout_gravity="top|start" />
+    <Button
+        android:id="@+id/showAllMarkers"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Show Markers" />
+
+    <FrameLayout
+        android:id="@+id/greyed_background_remove"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#999999"
+        android:visibility="gone"
+        android:clickable="false">
+
+        <LinearLayout
+            android:id="@+id/checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_gravity="center"
+            android:padding="24dp">
+
+            <ImageButton
+                android:id="@+id/exitMenuButton"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:layout_gravity="top|end"
+                android:src="@mipmap/exitbutton_round"
+                android:padding="24dp"
+                />
+
+            <CheckBox
+                android:id="@+id/weatherCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Weather" />
+
+            <CheckBox
+                android:id="@+id/countiesCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Counties" />
+
+            <CheckBox
+                android:id="@+id/statesCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="States" />
+
+            <CheckBox
+                android:id="@+id/tornadoesCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tornadoes" />
+
+            <CheckBox
+                android:id="@+id/hurricanesCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Hurricanes" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>
