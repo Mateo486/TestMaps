@@ -1,35 +1,38 @@
 package com.example.testmaps
 
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ImageButton
-import android.widget.LinearLayout
-import android.widget.Spinner
-
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.example.testmaps.databinding.ActivityMapsBinding
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.PolylineOptions
-import com.google.android.gms.maps.model.MarkerOptions
-import com.example.testmaps.databinding.ActivityMapsBinding
-import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener
-import com.google.android.gms.maps.UiSettings
 import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.StrokeStyle
-import com.google.android.gms.maps.model.StyleSpan
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.maps.android.data.geojson.GeoJsonLayer
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import android.util.SparseArray
+import android.widget.CheckBox
+import android.widget.TextView
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import okhttp3.Call
+import org.json.JSONObject
+import java.io.IOException
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityMapsBinding
-
+    private var layers: HashMap<Int,GeoJsonLayer> = HashMap()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -54,7 +57,53 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             background.visibility = View.GONE
         }
 
+        val tornadoKey = loadGeoJsonFromUrl("https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson")
+        val countiesCheckbox = findViewById<CheckBox>(R.id.countiesCheckbox)
+        val countriesCheckBox = findViewById<CheckBox>(R.id.countriesCheckbox)
+        val statesCheckbox = findViewById<CheckBox>(R.id.statesCheckbox)
+        val tornadoesCheckbox = findViewById<CheckBox>(R.id.tornadoesCheckbox)
+        val statesChecked = false;
+        val countriesChecked = false;
+        val countiesChecked = false;
+        val tornadoesChecked = false;
 
+
+
+        countiesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
+            !countiesChecked
+            if (isChecked){
+                layers[R.raw.us_counties]?.addLayerToMap()
+            }else{
+                layers[R.raw.us_counties]?.removeLayerFromMap()
+            }
+        }
+
+        countriesCheckBox.setOnCheckedChangeListener{ buttonView, isChecked ->
+            !countriesChecked
+            if (isChecked){
+                layers[R.raw.countries]?.addLayerToMap()
+            }else{
+                layers[R.raw.countries]?.removeLayerFromMap()
+            }
+        }
+
+        statesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
+            !statesChecked
+            if (isChecked){
+                layers[R.raw.us_states]?.addLayerToMap()
+            }else{
+                layers[R.raw.us_states]?.removeLayerFromMap()
+            }
+        }
+
+        tornadoesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
+            !tornadoesChecked
+            if (isChecked){
+                layers[tornadoKey]?.addLayerToMap()
+            }else{
+                layers[tornadoKey]?.removeLayerFromMap()
+            }
+        }
 
 
     }
@@ -74,41 +123,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap = googleMap
         mMap.uiSettings.isZoomControlsEnabled = true
 
-        val gainesville = LatLng(29.6520, -82.3520)
-        mMap.addMarker(MarkerOptions().position(gainesville).title("Marker in Gainesville"))
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(gainesville))
-
-
-
-        val gainesvillePoly = PolylineOptions()
-            .add(LatLng(29.5520,-82.4520))
-            .add (LatLng(29.7520,-82.4520))
-            .add (LatLng(29.7520,-82.2520))
-            .add(LatLng(29.5520,-82.2520))
-            .add(LatLng(29.5520,-82.4520))
-        mMap.addPolyline(gainesvillePoly)
-
-        mMap.addPolyline(
-            PolylineOptions()
-                .add(LatLng(29.5520,-82.4520), LatLng(29.7520,-82.4520))
-                .addSpan(StyleSpan(Color.RED))
-        )
-
-        mMap.addPolyline(
-            PolylineOptions()
-                .add (LatLng(29.7520,-82.4520),LatLng(29.7520,-82.2520))
-                .addSpan(
-                    StyleSpan(
-                        StrokeStyle.gradientBuilder(
-                            Color.RED,
-                            Color.YELLOW
-                        ).build()
-                    )
-                )
-        )
         val markers: MutableMap<Marker,LatLng> = mutableMapOf()
         var recentMarker: Marker? = null
         var markersVisible = true
+
+        val statesData = loadGeoJsonFromResource(R.raw.us_states)
+        val countriesData = loadGeoJsonFromResource(R.raw.countries)
+        val countiesData = loadGeoJsonFromResource(R.raw.us_counties)
+
+
 
         fun addMarker(latLng: LatLng): Marker? {
             recentMarker?.isVisible = false
@@ -124,7 +147,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 markers[marker] = latLng
                 recentMarker = marker
             }
-            marker?.showInfoWindow()
+            //marker?.showInfoWindow()
 
             return marker
         }
@@ -132,6 +155,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         fun removeMarker(marker: Marker){
             marker.remove()
             markers.remove(marker)
+            true
         }
 
         fun clearMarkers(){
@@ -142,12 +166,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
 
+
         mMap.setOnMapClickListener { latLng ->
             addMarker(latLng)
         }
 
-        mMap.setOnMarkerClickListener{ marker ->
-            removeMarker(marker)
+
+        mMap.setOnMarkerClickListener { marker ->
+            displayMetadata(marker)
             true
         }
 
@@ -165,6 +191,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
+
+
         val showAllMarkers: Button = findViewById(R.id.showAllMarkers)
         showAllMarkers.setOnClickListener{
             toggleMarkers()
@@ -172,4 +200,62 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
     }
+
+    private fun displayMetadata(marker : Marker) {
+        val text = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.metadata_display, null)
+
+        val markerTitle = sheetView.findViewById<TextView>(R.id.markerTitle)
+        val markerDetails = sheetView.findViewById<TextView>(R.id.markerDetails)
+        markerTitle.text = marker.title
+        markerDetails.text = "hello just wanted to show you this is working"
+        text.setContentView(sheetView)
+        text.show()
+    }
+
+
+    private fun loadGeoJsonFromResource(resourceId: Int){
+        try {
+            val layer = GeoJsonLayer(mMap,resourceId,baseContext)
+            layers.put(resourceId,layer)
+            layer.setOnFeatureClickListener { feature ->
+                val fid = feature.id
+                val name = feature.properties.first().toString().substring(5)
+                if(fid != null){
+                    Toast.makeText(this,fid +": "+ name, Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception){
+            e.printStackTrace()
+        }
+
+    }
+
+    private fun loadGeoJsonFromUrl(url: String): Int {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url(url)
+            .build()
+
+        val jsonKey = System.currentTimeMillis().toInt()
+
+        client.newCall(request).enqueue(object : okhttp3.Callback {
+            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                val jsonData = response.body?.string()
+                if (jsonData != null) {
+                    //parsing for attributes for each indiv tornado
+                    Log.d("testing",jsonData)
+                    val layer = GeoJsonLayer(mMap,JSONObject(jsonData))
+                    layers[jsonKey] = layer
+                }
+            }
+
+            override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+                e.printStackTrace()
+            }
+        })
+        return jsonKey
+    }
+
+
 }

@@ -48,6 +48,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("com.google.maps.android:android-maps-utils:2.2.3")
 }
 
 secrets {
