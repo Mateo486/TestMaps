@@ -28,22 +28,32 @@ import okhttp3.Call
 import org.json.JSONObject
 import java.io.IOException
 
+
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityMapsBinding
-    private var layers: HashMap<Int,GeoJsonLayer> = HashMap()
+    private val layers = hashMapOf<Int, GeoJsonLayer>()
+
+    private val preferences = "MyPrefs"
+    private val keycountieschecked = "countiesChecked"
+    private val keycountrieschecked = "countriesChecked"
+    private val keystateschecked = "statesChecked"
+    private val keytornadoeschecked = "tornadoesChecked"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        val mapFragment = supportFragmentManager
-            .findFragmentById(R.id.map) as SupportMapFragment
+        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+        initUiComponents()
+    }
+
+    private fun initUiComponents() {
         val dropdownButton = findViewById<ImageButton>(R.id.showCheckboxButton)
         val background = findViewById<View>(R.id.greyed_background_remove)
 
@@ -52,210 +62,199 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         val exitmenubutton = findViewById<ImageButton>(R.id.exitMenuButton)
-
         exitmenubutton.setOnClickListener {
             background.visibility = View.GONE
         }
 
-        val tornadoKey = loadGeoJsonFromUrl("https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson")
         val countiesCheckbox = findViewById<CheckBox>(R.id.countiesCheckbox)
         val countriesCheckBox = findViewById<CheckBox>(R.id.countriesCheckbox)
         val statesCheckbox = findViewById<CheckBox>(R.id.statesCheckbox)
         val tornadoesCheckbox = findViewById<CheckBox>(R.id.tornadoesCheckbox)
-        val statesChecked = false;
-        val countriesChecked = false;
-        val countiesChecked = false;
-        val tornadoesChecked = false;
 
+        val sharedPreferences = getSharedPreferences(preferences, MODE_PRIVATE)
+        countiesCheckbox.isChecked = sharedPreferences.getBoolean(keycountieschecked, false)
+        countriesCheckBox.isChecked = sharedPreferences.getBoolean(keycountrieschecked, false)
+        statesCheckbox.isChecked = sharedPreferences.getBoolean(keystateschecked, false)
+        tornadoesCheckbox.isChecked = sharedPreferences.getBoolean(keytornadoeschecked, false)
 
-
-        countiesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
-            !countiesChecked
-            if (isChecked){
-                layers[R.raw.us_counties]?.addLayerToMap()
-            }else{
-                layers[R.raw.us_counties]?.removeLayerFromMap()
-            }
-        }
-
-        countriesCheckBox.setOnCheckedChangeListener{ buttonView, isChecked ->
-            !countriesChecked
-            if (isChecked){
-                layers[R.raw.countries]?.addLayerToMap()
-            }else{
-                layers[R.raw.countries]?.removeLayerFromMap()
-            }
-        }
-
-        statesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
-            !statesChecked
-            if (isChecked){
-                layers[R.raw.us_states]?.addLayerToMap()
-            }else{
-                layers[R.raw.us_states]?.removeLayerFromMap()
-            }
-        }
-
-        tornadoesCheckbox.setOnCheckedChangeListener{ buttonView, isChecked ->
-            !tornadoesChecked
-            if (isChecked){
-                layers[tornadoKey]?.addLayerToMap()
-            }else{
-                layers[tornadoKey]?.removeLayerFromMap()
-            }
-        }
-
-
+        setupCheckBoxListeners()
     }
 
+    private fun setupCheckBoxListeners() {
+        val countiesCheckbox = findViewById<CheckBox>(R.id.countiesCheckbox)
+        val countriesCheckBox = findViewById<CheckBox>(R.id.countriesCheckbox)
+        val statesCheckbox = findViewById<CheckBox>(R.id.statesCheckbox)
+        val tornadoesCheckbox = findViewById<CheckBox>(R.id.tornadoesCheckbox)
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
+        countiesCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            toggleLayer(R.raw.us_counties, isChecked)
+        }
+
+        countriesCheckBox.setOnCheckedChangeListener { _, isChecked ->
+            toggleLayer(R.raw.countries, isChecked)
+        }
+
+        statesCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            toggleLayer(R.raw.us_states, isChecked)
+        }
+
+        tornadoesCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            toggleLayer(loadGeoJsonFromUrl(
+                "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson",
+                tornadoesCheckbox
+            ), isChecked)
+        }
+    }
+
+    private fun toggleLayer(layerId: Int, addLayer: Boolean) {
+        if (addLayer) {
+            layers[layerId]?.addLayerToMap()
+        } else {
+            layers[layerId]?.removeLayerFromMap()
+        }
+        saveCheckboxStates()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveCheckboxStates()
+    }
+
+    private fun saveCheckboxStates() {
+        val prefs = getSharedPreferences(preferences, MODE_PRIVATE)
+        val editor = prefs.edit()
+        val countiesCheckbox = findViewById<CheckBox>(R.id.countiesCheckbox)
+        val countriesCheckBox = findViewById<CheckBox>(R.id.countriesCheckbox)
+        val statesCheckbox = findViewById<CheckBox>(R.id.statesCheckbox)
+        val tornadoesCheckbox = findViewById<CheckBox>(R.id.tornadoesCheckbox)
+
+        editor.putBoolean(keycountieschecked, countiesCheckbox.isChecked)
+        editor.putBoolean(keycountrieschecked, countriesCheckBox.isChecked)
+        editor.putBoolean(keystateschecked, statesCheckbox.isChecked)
+        editor.putBoolean(keytornadoeschecked, tornadoesCheckbox.isChecked)
+        editor.apply()
+    }
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         mMap.uiSettings.isZoomControlsEnabled = true
 
-        val markers: MutableMap<Marker,LatLng> = mutableMapOf()
+        if (findViewById<CheckBox>(R.id.countiesCheckbox).isChecked) {
+            loadGeoJsonFromResource(R.raw.us_counties)
+        }
+        if (findViewById<CheckBox>(R.id.countriesCheckbox).isChecked) {
+            loadGeoJsonFromResource(R.raw.countries)
+        }
+        if (findViewById<CheckBox>(R.id.statesCheckbox).isChecked) {
+            loadGeoJsonFromResource(R.raw.us_states)
+        }
+        if (findViewById<CheckBox>(R.id.tornadoesCheckbox).isChecked) {
+            loadGeoJsonFromUrl(
+                "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson",
+                findViewById<CheckBox>(R.id.tornadoesCheckbox)
+            )
+        }
+
+        setupMapInteractions()
+    }
+
+    private fun setupMapInteractions() {
+        val markers: MutableMap<Marker, LatLng> = mutableMapOf()
         var recentMarker: Marker? = null
-        var markersVisible = true
-
-        val statesData = loadGeoJsonFromResource(R.raw.us_states)
-        val countriesData = loadGeoJsonFromResource(R.raw.countries)
-        val countiesData = loadGeoJsonFromResource(R.raw.us_counties)
-
-
-
-        fun addMarker(latLng: LatLng): Marker? {
-            recentMarker?.isVisible = false
-            val latitude = latLng.latitude
-            val longitude = latLng.longitude
-            val markerOptions = MarkerOptions()
-                .position(latLng)
-                .title("Latitude: $latitude, Longitude: $longitude" ?: "Marker")
-
-            val marker = googleMap.addMarker(markerOptions)
-
-            if(marker != null){
-                markers[marker] = latLng
-                recentMarker = marker
-            }
-            //marker?.showInfoWindow()
-
-            return marker
-        }
-
-        fun removeMarker(marker: Marker){
-            marker.remove()
-            markers.remove(marker)
-            true
-        }
-
-        fun clearMarkers(){
-            for (key in markers.keys) {
-                key.remove()
-            }
-            markers.clear()
-        }
-
-
 
         mMap.setOnMapClickListener { latLng ->
-            addMarker(latLng)
+            recentMarker?.isVisible = false
+            recentMarker = addMarker(latLng, markers)
         }
-
 
         mMap.setOnMarkerClickListener { marker ->
             displayMetadata(marker)
             true
         }
 
-        fun toggleMarkers() {
-            if (markersVisible) {
-                for (marker in markers.keys) {
-                    marker.isVisible = false
-                }
-                markersVisible = false
-            } else {
-                for (marker in markers.keys){
-                    marker.isVisible = true
-                }
-                markersVisible = true
-            }
-        }
-
-
-
         val showAllMarkers: Button = findViewById(R.id.showAllMarkers)
-        showAllMarkers.setOnClickListener{
-            toggleMarkers()
+        var markersVisible = true
+        showAllMarkers.setOnClickListener {
+            markersVisible = toggleMarkersVisibility(markers, markersVisible)
             showAllMarkers.text = if (markersVisible) "Hide Markers" else "Show Markers"
         }
-
     }
 
-    private fun displayMetadata(marker : Marker) {
+    private fun addMarker(latLng: LatLng, markers: MutableMap<Marker, LatLng>): Marker? {
+        val marker = mMap.addMarker(MarkerOptions().position(latLng).title("Latitude: ${latLng.latitude}, Longitude: ${latLng.longitude}"))
+        if (marker != null) {
+            markers[marker] = latLng
+        }
+        return marker
+    }
+
+    private fun toggleMarkersVisibility(markers: Map<Marker, LatLng>, markersVisible: Boolean): Boolean {
+        for (marker in markers.keys) {
+            marker.isVisible = !markersVisible
+        }
+        return !markersVisible
+    }
+
+    private fun displayMetadata(marker: Marker) {
         val text = BottomSheetDialog(this)
         val sheetView = layoutInflater.inflate(R.layout.metadata_display, null)
-
-        val markerTitle = sheetView.findViewById<TextView>(R.id.markerTitle)
-        val markerDetails = sheetView.findViewById<TextView>(R.id.markerDetails)
-        markerTitle.text = marker.title
-        markerDetails.text = "hello just wanted to show you this is working"
+        sheetView.findViewById<TextView>(R.id.markerTitle).text = marker.title
+        sheetView.findViewById<TextView>(R.id.markerDetails).text = "hello just wanted to show you this is working"
         text.setContentView(sheetView)
         text.show()
     }
 
-
-    private fun loadGeoJsonFromResource(resourceId: Int){
+    private fun loadGeoJsonFromResource(resourceId: Int) {
         try {
-            val layer = GeoJsonLayer(mMap,resourceId,baseContext)
-            layers.put(resourceId,layer)
-            layer.setOnFeatureClickListener { feature ->
-                val fid = feature.id
-                val name = feature.properties.first().toString().substring(5)
-                if(fid != null){
-                    Toast.makeText(this,fid +": "+ name, Toast.LENGTH_SHORT).show()
-                }
+            val layer = GeoJsonLayer(mMap, resourceId, baseContext)
+            layers[resourceId] = layer
+            if (isCheckboxCheckedForResource(resourceId)) {
+                layer.addLayerToMap()
             }
-        } catch (e: Exception){
+            setupLayerClickListener(layer)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
-
     }
 
-    private fun loadGeoJsonFromUrl(url: String): Int {
+    private fun isCheckboxCheckedForResource(resourceId: Int): Boolean {
+        return when (resourceId) {
+            R.raw.us_counties -> findViewById<CheckBox>(R.id.countiesCheckbox).isChecked
+            R.raw.countries -> findViewById<CheckBox>(R.id.countriesCheckbox).isChecked
+            R.raw.us_states -> findViewById<CheckBox>(R.id.statesCheckbox).isChecked
+            else -> false
+        }
+    }
+
+    private fun setupLayerClickListener(layer: GeoJsonLayer) {
+        layer.setOnFeatureClickListener { feature ->
+            Toast.makeText(this, "${feature.id}: ${feature.properties.first()}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun loadGeoJsonFromUrl(url: String, checkbox: CheckBox): Int {
         val client = OkHttpClient()
-        val request = Request.Builder()
-            .url(url)
-            .build()
-
+        val request = Request.Builder().url(url).build()
         val jsonKey = System.currentTimeMillis().toInt()
-
         client.newCall(request).enqueue(object : okhttp3.Callback {
-            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+            override fun onResponse(call: Call, response: Response) {
                 val jsonData = response.body?.string()
                 if (jsonData != null) {
-                    //parsing for attributes for each indiv tornado
-                    Log.d("testing",jsonData)
-                    val layer = GeoJsonLayer(mMap,JSONObject(jsonData))
+                    val layer = GeoJsonLayer(mMap, JSONObject(jsonData))
                     layers[jsonKey] = layer
+                    runOnUiThread {
+                        if (checkbox.isChecked) {
+                            layer.addLayerToMap()
+                        }
+                        setupLayerClickListener(layer)
+                    }
                 }
             }
 
-            override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+            override fun onFailure(call: Call, e: IOException) {
                 e.printStackTrace()
             }
         })
         return jsonKey
     }
-
-
 }
