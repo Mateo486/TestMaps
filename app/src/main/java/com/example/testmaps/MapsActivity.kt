@@ -1,11 +1,11 @@
 package com.example.testmaps
 
-import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.testmaps.databinding.ActivityMapsBinding
@@ -16,24 +16,16 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.maps.android.data.geojson.GeoJsonLayer
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import android.util.SparseArray
-import android.widget.CheckBox
-import android.widget.TextView
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import okhttp3.Call
+import com.google.maps.android.data.geojson.GeoJsonLayer
 import org.json.JSONObject
-import java.io.IOException
-
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityMapsBinding
     private val layers = hashMapOf<Int, GeoJsonLayer>()
+    private val httpManager = HTTPManager()
 
     private val preferences = "MyPrefs"
     private val keycountieschecked = "countiesChecked"
@@ -99,10 +91,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         tornadoesCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            toggleLayer(loadGeoJsonFromUrl(
-                "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson",
-                tornadoesCheckbox
-            ), isChecked)
+            httpManager.get("https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson") { success, data ->
+                if (success && data != null) {
+                    val jsonKey = System.currentTimeMillis().toInt()
+                    val layer = GeoJsonLayer(mMap, JSONObject(data))
+                    layers[jsonKey] = layer
+                    runOnUiThread {
+                        if (tornadoesCheckbox.isChecked) {
+                            layer.addLayerToMap()
+                        }
+                        setupLayerClickListener(layer)
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Failed to load tornado data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
@@ -149,10 +154,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             loadGeoJsonFromResource(R.raw.us_states)
         }
         if (findViewById<CheckBox>(R.id.tornadoesCheckbox).isChecked) {
-            loadGeoJsonFromUrl(
-                "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson",
-                findViewById<CheckBox>(R.id.tornadoesCheckbox)
-            )
+            httpManager.get("https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/NOAA_storm_reports_v1/FeatureServer/1/query?where=1%3D1&outFields=*&f=Geojson") { success, data ->
+                if (success && data != null) {
+                    val jsonKey = System.currentTimeMillis().toInt()
+                    val layer = GeoJsonLayer(mMap, JSONObject(data))
+                    layers[jsonKey] = layer
+                    runOnUiThread {
+                        if (findViewById<CheckBox>(R.id.tornadoesCheckbox).isChecked) {
+                            layer.addLayerToMap()
+                        }
+                        setupLayerClickListener(layer)
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Failed to load tornado data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
 
         setupMapInteractions()
@@ -230,31 +248,5 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         layer.setOnFeatureClickListener { feature ->
             Toast.makeText(this, "${feature.id}: ${feature.properties.first()}", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    private fun loadGeoJsonFromUrl(url: String, checkbox: CheckBox): Int {
-        val client = OkHttpClient()
-        val request = Request.Builder().url(url).build()
-        val jsonKey = System.currentTimeMillis().toInt()
-        client.newCall(request).enqueue(object : okhttp3.Callback {
-            override fun onResponse(call: Call, response: Response) {
-                val jsonData = response.body?.string()
-                if (jsonData != null) {
-                    val layer = GeoJsonLayer(mMap, JSONObject(jsonData))
-                    layers[jsonKey] = layer
-                    runOnUiThread {
-                        if (checkbox.isChecked) {
-                            layer.addLayerToMap()
-                        }
-                        setupLayerClickListener(layer)
-                    }
-                }
-            }
-
-            override fun onFailure(call: Call, e: IOException) {
-                e.printStackTrace()
-            }
-        })
-        return jsonKey
     }
 }
